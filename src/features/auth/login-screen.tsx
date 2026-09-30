@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { toLatinDigits, toPersianDigits } from "@/lib/format";
 import { DEMO_MODE } from "@/lib/demo-mode";
 import { useRouter } from "@/navigation/router";
+import { ThemeToggle } from "@/components/shared/app-shell";
 
 export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => void }) {
   const { navigate } = useRouter();
@@ -43,6 +44,10 @@ export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => voi
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
+      {/* Theme toggle — top corner */}
+      <div className="fixed left-4 top-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="flex flex-1 flex-col justify-center px-6 pb-10 pt-16">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
@@ -72,6 +77,7 @@ export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => voi
               id="phone"
               inputMode="numeric"
               autoComplete="tel"
+              autoFocus
               dir="ltr"
               placeholder="0912 345 6789"
               className="h-14 rounded-2xl border-input bg-card text-center text-lg font-bold tracking-[0.2em] nums"

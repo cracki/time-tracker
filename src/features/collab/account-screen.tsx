@@ -23,17 +23,18 @@ import { authApi, draftApi, ApiError } from "@/lib/api";
 import { DEMO_MODE } from "@/lib/demo-mode";
 import { setSimOffline } from "@/lib/sim-offline";
 import { useAuth } from "@/providers/auth-provider";
+import { useRouter } from "@/navigation/router";
 import { formatJalali, today } from "@/lib/jalali";
 import { minutesToHHMM } from "@/lib/duration";
 import { toPersianDigits } from "@/lib/format";
+import { APP_VERSION } from "@/lib/app-version";
 import { relativeDayLabel } from "@/lib/jalali";
 import { usePwaInstaller } from "@/components/shared/app-shell";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION = "1.0.0";
-
 export function AccountScreen() {
   const { user, signOut, updateUser } = useAuth();
+  const { navigate } = useRouter();
   const { theme, setTheme } = useTheme();
   const qc = useQueryClient();
   const { count, syncing, sync, refresh: refreshDrafts } = useDraftSync();
@@ -287,7 +288,18 @@ export function AccountScreen() {
               <Info className="size-4 text-muted-foreground" aria-hidden />
               نسخه برنامه
             </span>
-            <span className="text-xs text-muted-foreground nums" dir="ltr">{toPersianDigits(APP_VERSION)}</span>
+            <span className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground nums" dir="ltr">{toPersianDigits(APP_VERSION)}</span>
+              <button
+                type="button"
+                onClick={() => navigate("/about")}
+                aria-label="درباره زمان‌سنج"
+                title="درباره زمان‌سنج"
+                className="ms-1 flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Info className="size-4" aria-hidden />
+              </button>
+            </span>
           </div>
           <Separator />
           <div className="flex items-center justify-between py-3">

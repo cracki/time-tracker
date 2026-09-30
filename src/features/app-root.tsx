@@ -29,6 +29,7 @@ import { OutsideHoursScreen } from "@/features/admin/outside-hours-screen";
 import { CalendarScreen } from "@/features/admin/calendar-screen";
 import { HolidaysScreen } from "@/features/admin/holidays-screen";
 import { MoreScreen } from "@/features/admin/more-screen";
+import { AboutScreen } from "@/features/shared/about-screen";
 
 /** Splash / launch experience (spec §36) */
 export function Splash() {
@@ -91,6 +92,9 @@ function AppGate() {
   if (status === "loading") return <Splash />;
 
   if (status === "guest") {
+    if (path === "/about") {
+      return <AboutScreen />;
+    }
     if (path === "/otp" && otpInfo) {
       return (
         <OtpScreen
@@ -198,6 +202,7 @@ function ScreenSwitch({
     if (path === "/calendar") return <CalendarScreen />;
     if (path === "/holidays") return <HolidaysScreen />;
     if (path === "/more") return <MoreScreen />;
+    if (path === "/about") return <AboutScreen />;
     return <NotFound />;
   }, [path, segments, isAdmin]);
 
