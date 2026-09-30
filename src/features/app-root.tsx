@@ -93,7 +93,13 @@ function AppGate() {
 
   if (status === "guest") {
     if (path === "/about") {
-      return <AboutScreen />;
+      // Same padding contract as AppShell's <main> — PageHeader counters it
+      // with negative margins, so the bare guest route needs them too.
+      return (
+        <div className="mx-auto w-full max-w-5xl px-4 md:px-6">
+          <AboutScreen />
+        </div>
+      );
     }
     if (path === "/otp" && otpInfo) {
       return (
