@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Timer } from "lucide-react";
 import { AuthProvider } from "@/providers/auth-provider";
 import { RouterProvider } from "@/navigation/router";
 
@@ -9,9 +8,7 @@ import { RouterProvider } from "@/navigation/router";
 function InlineSplash() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background" aria-label="در حال بارگذاری">
-      <div className="flex size-20 items-center justify-center rounded-[1.6rem] bg-primary text-primary-foreground shadow-xl shadow-primary/25">
-        <Timer className="size-9" aria-hidden />
-      </div>
+      <img src="/logo.png" alt="" aria-hidden className="size-20 app-shadow" />
       <p className="mt-5 text-xl font-extrabold">زمان‌سنج</p>
       <p className="mt-1 text-xs text-muted-foreground">ثبت سریع زمان کاری</p>
     </div>
