@@ -39,6 +39,15 @@ export function PersonSummaryScreen({ userId }: { userId: string }) {
       {data ? (
         <div className="mb-4 rounded-2xl border bg-card p-4 app-shadow">
           <UserChip user={data.summary.user} size="md" />
+          {data.summary.user.role === "collaborator" ? (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              {data.summary.user.managerName ? (
+                <>مدیر: <b className="font-bold text-foreground">{data.summary.user.managerName}</b></>
+              ) : (
+                "بدون مدیر"
+              )}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

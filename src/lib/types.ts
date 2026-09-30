@@ -1,6 +1,7 @@
 /** Domain types — mirrors spec §6/§57/§58 field contracts. */
 
-export type Role = "admin" | "collaborator";
+/** admin = مدیر ارشد (view-only) · manager = تأیید تیم خودش · collaborator = همکار */
+export type Role = "admin" | "manager" | "collaborator";
 
 export type TimeLogStatus = "pending" | "approved" | "adjusted" | "rejected";
 
@@ -19,6 +20,10 @@ export interface User {
   avatarColor: string;
   /** Web path of the uploaded avatar; null → initials avatar */
   avatarUrl: string | null;
+  /** Collaborators only — the manager who reviews their logs */
+  managerId: string | null;
+  /** Denormalized for display; present when the query includes the manager */
+  managerName?: string | null;
 }
 
 export interface TimeLog {

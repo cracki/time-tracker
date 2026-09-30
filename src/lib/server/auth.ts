@@ -25,6 +25,8 @@ export function toPublicUser(u: {
   isActive: boolean;
   avatarColor: string;
   avatarUrl?: string | null;
+  managerId?: string | null;
+  manager?: { name: string } | null;
 }): User {
   return {
     id: u.id,
@@ -34,6 +36,8 @@ export function toPublicUser(u: {
     isActive: u.isActive,
     avatarColor: u.avatarColor,
     avatarUrl: u.avatarUrl ?? null,
+    managerId: u.managerId ?? null,
+    managerName: u.manager?.name ?? null,
   };
 }
 
@@ -50,7 +54,10 @@ export async function getSessionUser(): Promise<User | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const session = await db.session.findUnique({ where: { id: hashToken(token) }, include: { user: true } });
+  const session = await db.session.findUnique({
+    where: { id: hashToken(token) },
+    include: { user: { include: { manager: { select: { name: true } } } } },
+  });
   if (!session) return null;
   if (session.expiresAt.getTime() < Date.now()) {
     void db.session.deleteMany({ where: { id: session.id } }).catch(() => {});
@@ -67,10 +74,28 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
-/** Throws 401/403 unless the caller is an active admin. */
+/** Throws 401/403 unless the caller is an active admin (مدیر ارشد). */
 export async function requireAdmin(): Promise<User> {
   const user = await requireUser();
-  if (user.role !== "admin") throw new ServerError("این عملیات نیاز به دسترسی مدیر دارد.", "forbidden");
+  if (user.role !== "admin") throw new ServerError("این عملیات نیاز به دسترسی مدیر ارشد دارد.", "forbidden");
+  return user;
+}
+
+/** Throws 401/403 unless the caller is a manager or the supreme admin. */
+export async function requireManagerOrAdmin(): Promise<User> {
+  const user = await requireUser();
+  if (user.role !== "admin" && user.role !== "manager") {
+    throw new ServerError("این بخش فقط برای مدیران است.", "forbidden");
+  }
+  return user;
+}
+
+/** Throws 403 unless the caller is a manager — decisions belong to team managers only. */
+export async function requireManager(): Promise<User> {
+  const user = await requireUser();
+  if (user.role !== "manager") {
+    throw new ServerError("تصمیم‌گیری (تأیید/رد/اصلاح) فقط توسط مدیر تیم امکان دارد.", "forbidden");
+  }
   return user;
 }
 

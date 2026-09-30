@@ -40,7 +40,8 @@ export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => voi
 
   // Demo accounts (seeded by scripts/seed.ts) — quick-fill chips for the demo deployment.
   const demoAdmin = { name: "علی رضایی", mobile: "09121000000" };
-  const demoCollab = { name: "مریم احمدی", mobile: "09121111111" };
+  const demoManager = { name: "مریم احمدی", mobile: "09122000001" };
+  const demoCollab = { name: "حسین موسوی", mobile: "09123000001" };
   const demoMode = DEMO_MODE;
 
   return (
@@ -109,23 +110,22 @@ export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => voi
                   <Info className="size-3.5" aria-hidden />
                   حساب‌های نمونه (نسخه نمایشی)
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPhone(demoAdmin.mobile)}
-                    className="min-h-11 rounded-xl border bg-card px-3 py-2 text-right transition-colors hover:border-primary/50"
-                  >
-                    <span className="block text-xs font-bold">مدیر</span>
-                    <span className="block text-[11px] text-muted-foreground nums" dir="ltr">{toPersianDigits(demoAdmin.mobile)}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPhone(demoCollab.mobile)}
-                    className="min-h-11 rounded-xl border bg-card px-3 py-2 text-right transition-colors hover:border-primary/50"
-                  >
-                    <span className="block text-xs font-bold">همکار</span>
-                    <span className="block text-[11px] text-muted-foreground nums" dir="ltr">{toPersianDigits(demoCollab.mobile)}</span>
-                  </button>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "مدیر ارشد", mobile: demoAdmin.mobile },
+                    { label: "مدیر", mobile: demoManager.mobile },
+                    { label: "همکار", mobile: demoCollab.mobile },
+                  ].map((d) => (
+                    <button
+                      key={d.label}
+                      type="button"
+                      onClick={() => setPhone(d.mobile)}
+                      className="min-h-11 rounded-xl border bg-card px-2 py-2 text-center transition-colors hover:border-primary/50"
+                    >
+                      <span className="block text-[11px] font-bold">{d.label}</span>
+                      <span className="block text-[10px] text-muted-foreground nums" dir="ltr">{toPersianDigits(d.mobile)}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : null}

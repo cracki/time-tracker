@@ -1,14 +1,17 @@
-/** GET /api/admin/logs — all logs with filters + pagination (spec §24/§59). */
+/**
+ * GET /api/admin/logs — logs with filters + pagination (spec §24/§59).
+ * admin (مدیر ارشد): all logs, view-only. manager: only their team's logs.
+ */
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { handle } from "@/lib/server/api-helpers";
-import { requireAdmin } from "@/lib/server/auth";
-import { logOrderBy, serializeLog } from "@/lib/server/data";
+import { requireManagerOrAdmin } from "@/lib/server/auth";
+import { logOrderBy, teamUserIds, serializeLog } from "@/lib/server/data";
 
 export async function GET(req: Request) {
   return handle(async () => {
-    await requireAdmin();
+    const actor = await requireManagerOrAdmin();
     const url = new URL(req.url);
     const from = url.searchParams.get("from") ?? undefined;
     const to = url.searchParams.get("to") ?? undefined;
@@ -25,9 +28,20 @@ export async function GET(req: Request) {
       dayType === "workday" ? { outsideKind: "normal" } :
       {};
 
+    // Team scope: admin sees everyone; a manager only their collaborators.
+    // An explicit userId filter is intersected with the scope — a manager
+    // asking for another team's collaborator simply gets an empty list.
+    const teamIds = await teamUserIds(actor);
+    let userIdFilter: Record<string, unknown> | undefined;
+    if (userId) {
+      userIdFilter = teamIds === null || teamIds.includes(userId) ? { equals: userId } : { in: [] };
+    } else if (teamIds !== null) {
+      userIdFilter = { in: teamIds };
+    }
+
     const where = {
       ...(from || to ? { workDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
-      ...(userId ? { userId } : {}),
+      ...(userIdFilter ? { userId: userIdFilter } : {}),
       ...(status ? { status } : {}),
       ...(outsideOnly ? { outsideKind: { not: "normal" } } : {}),
       ...dayTypeWhere,

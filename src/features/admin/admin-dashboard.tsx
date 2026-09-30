@@ -26,6 +26,7 @@ import { toPersianDigits } from "@/lib/format";
 
 export function AdminDashboardScreen() {
   const { user } = useAuth();
+  const isManager = user?.role === "manager";
   const { navigate } = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -36,9 +37,15 @@ export function AdminDashboardScreen() {
   });
 
   const { data: users } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => usersApi.getAll(),
-    enabled: !!user && user.role === "admin",
+    queryKey: ["dash-users", user?.role],
+    queryFn: async () => {
+      if (user?.role === "manager") {
+        const people = await adminApi.getPeople("");
+        return people.map((p) => p.user);
+      }
+      return usersApi.getAll();
+    },
+    enabled: !!user && (user.role === "admin" || user.role === "manager"),
   });
   const userById = (id: string) => (users ?? []).find((u) => u.id === id);
 
@@ -74,8 +81,10 @@ export function AdminDashboardScreen() {
     <div>
       <header className="-mx-4 mb-4 bg-gradient-to-b from-accent/70 to-background px-4 pb-5 pt-6 md:-mx-6 md:px-6">
         <div className="mx-auto w-full max-w-3xl">
-          <h1 className="text-2xl font-extrabold leading-9">داشبورد تیم</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">وضعیت ثبت و تأیید زمان در ۳۰ روز اخیر</p>
+          <h1 className="text-2xl font-extrabold leading-9">{isManager ? "داشبورد تیم من" : "داشبورد سازمان"}</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {isManager ? "وضعیت ثبت و تأیید زمان اعضای تیم شما — ۳۰ روز اخیر" : "وضعیت ثبت و تأیید زمان در ۳۰ روز اخیر — دسترسی شما فقط ملاحظه‌ای است"}
+          </p>
 
           {/* Pending action card — primary admin action */}
           {isLoading ? (
@@ -127,7 +136,7 @@ export function AdminDashboardScreen() {
               <StatCard label="اصلاح‌شده" value={data.adjustedMinutes} icon={PenLine} tone="adjusted" format={minutesToHHMM} hint={`${toPersianDigits(data.adjustedCount)} گزارش`} />
               <StatCard label="ردشده" value={data.rejectedMinutes} icon={XCircle} tone="danger" format={minutesToHHMM} />
               <StatCard label="خارج از ساعت اداری" value={data.outsideMinutes} icon={MoonStar} tone="outside" format={minutesToHHMM} onClick={() => navigate("/outside-hours")} />
-              <StatCard label="افراد تیم" value={data.peopleCount} icon={Users} format={(v) => toPersianDigits(Math.round(v))} onClick={() => navigate("/people")} />
+              <StatCard label={isManager ? "افراد من" : "افراد تیم"} value={data.peopleCount} icon={Users} format={(v) => toPersianDigits(Math.round(v))} onClick={() => navigate("/people")} />
               <StatCard label="فعال امروز" value={data.activeToday} icon={TrendingUp} format={(v) => toPersianDigits(Math.round(v))} hint="ثبت گزارش امروز" />
             </div>
 
@@ -170,8 +179,8 @@ export function AdminDashboardScreen() {
                       showUser
                       user={userById(log.userId)}
                       onOpen={() => navigate(`/logs/${log.id}`)}
-                      onApprove={() => void quickApprove(log.id)}
-                      onReject={() => void quickReject(log.id)}
+                      onApprove={isManager ? () => void quickApprove(log.id) : undefined}
+                      onReject={isManager ? () => void quickReject(log.id) : undefined}
                       busy={busyId === log.id}
                     />
                   ))}

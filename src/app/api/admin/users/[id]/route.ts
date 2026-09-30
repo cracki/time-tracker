@@ -34,6 +34,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       role?: string;
       isActive?: boolean;
       avatarColor?: string;
+      managerId?: string | null;
     }>(req);
 
     const data: {
@@ -42,6 +43,7 @@ export async function PUT(req: Request, ctx: Ctx) {
       role?: string;
       isActive?: boolean;
       avatarColor?: string;
+      managerId?: string | null;
     } = {};
 
     if (body.name !== undefined) data.name = requireString(body.name, "نام و نام خانوادگی", { max: 60 });
@@ -55,7 +57,8 @@ export async function PUT(req: Request, ctx: Ctx) {
       data.mobile = body.mobile;
     }
 
-    const newRole = body.role === "admin" ? "admin" : body.role === "collaborator" ? "collaborator" : undefined;
+    const newRole =
+      body.role === "admin" || body.role === "manager" || body.role === "collaborator" ? body.role : undefined;
     const newActive = typeof body.isActive === "boolean" ? body.isActive : undefined;
 
     const isSelf = target.id === admin.id;
@@ -84,7 +87,28 @@ export async function PUT(req: Request, ctx: Ctx) {
       data.avatarColor = body.avatarColor;
     }
 
-    const user = await db.user.update({ where: { id }, data });
+    // ── Hierarchy: managerId assignment (collaborators only) ──
+    if (body.managerId !== undefined) {
+      if (body.managerId === null) {
+        data.managerId = null;
+      } else if ((newRole ?? target.role) === "collaborator") {
+        const manager = await db.user.findUnique({ where: { id: body.managerId } });
+        if (!manager || manager.role !== "manager" || !manager.isActive) {
+          throw new ServerError("مدیر انتخاب‌شده معتبر نیست.", "validation");
+        }
+        if (manager.id === target.id) {
+          throw new ServerError("یک کاربر نمی‌تواند مدیر خودش باشد.", "validation");
+        }
+        data.managerId = manager.id;
+      } else {
+        throw new ServerError("فقط همکاران زیر نظر یک مدیر قرار می‌گیرند.", "validation");
+      }
+    } else if (newRole !== undefined && newRole !== "collaborator") {
+      // promotion out of a team clears the link
+      data.managerId = null;
+    }
+
+    const user = await db.user.update({ where: { id }, data, include: { manager: { select: { name: true } } } });
     return NextResponse.json({ user: toPublicUser(user) });
   });
 }

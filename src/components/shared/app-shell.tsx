@@ -88,6 +88,12 @@ const ADMIN_MORE: NavItem[] = [
   { key: "account", path: "/account", label: "حساب کاربری", icon: Settings2 },
 ];
 
+/** Managers (team leads): no org settings — only team reports + account */
+const MANAGER_MORE: NavItem[] = [
+  { key: "outside", path: "/outside-hours", label: "خارج از ساعت اداری", icon: Timer },
+  { key: "account", path: "/account", label: "حساب کاربری", icon: Settings2 },
+];
+
 function isActive(route: string, path: string): boolean {
   if (path === "/home") return route === "/home";
   return route === path || route.startsWith(path + "/");
@@ -102,8 +108,10 @@ export function AppShell({
 }) {
   const { route, navigate } = useRouter();
   const { user, signOut } = useAuth();
-  const role: Role = user?.role === "admin" ? "admin" : "collaborator";
-  const nav = role === "admin" ? ADMIN_NAV : COLLAB_NAV;
+  const role: Role = user?.role === "admin" ? "admin" : user?.role === "manager" ? "manager" : "collaborator";
+  // Managers and the supreme admin share the same management nav; the
+  // "بیشتر" section contents differ (org settings are admin-only).
+  const nav = role === "admin" || role === "manager" ? ADMIN_NAV : COLLAB_NAV;
   const routePath = route.path;
 
   const showFab = role === "collaborator";
@@ -151,7 +159,7 @@ export function AppShell({
           {role === "admin" ? (
             <div className="pt-3">
               <p className="px-3.5 pb-1 text-[11px] font-bold text-muted-foreground/70">مدیریت</p>
-              {ADMIN_MORE.map((item) => {
+              {(role === "admin" ? ADMIN_MORE : MANAGER_MORE).map((item) => {
                 const active = isActive(routePath, item.path);
                 return (
                   <button

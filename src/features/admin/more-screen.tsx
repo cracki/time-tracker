@@ -10,10 +10,13 @@ import { CalendarClock, CalendarDays, ChevronLeft, Settings2, Timer, UsersRound 
 import { PageHeader } from "@/components/shared/page-header";
 import { useRouter } from "@/navigation/router";
 import { adminApi } from "@/lib/api";
+import { useAuth } from "@/providers/auth-provider";
 import { toPersianDigits } from "@/lib/format";
 
 export function MoreScreen() {
   const { navigate } = useRouter();
+  const { user } = useAuth();
+  const isManager = user?.role === "manager";
   const { data: pendingData } = useQuery({
     queryKey: ["admin-pending-count"],
     queryFn: () => adminApi.getLogs({ status: "pending", pageSize: 1 }),
@@ -21,17 +24,18 @@ export function MoreScreen() {
   });
   const pending = pendingData?.total ?? 0;
 
-  const ITEMS = [
-    { key: "users", path: "/users", title: "مدیریت کاربران", desc: "افزودن، ویرایش، فعال/غیرفعال‌سازی همکاران", icon: UsersRound, tone: "text-primary bg-accent" },
-    { key: "calendar", path: "/calendar", title: "تقویم کاری", desc: "روزها و ساعات کاری سازمان", icon: CalendarClock, tone: "text-primary bg-accent" },
-    { key: "holidays", path: "/holidays", title: "تعطیلات رسمی", desc: "ورود تعطیلات سالانه", icon: CalendarDays, tone: "text-danger bg-danger-soft" },
-    { key: "outside", path: "/outside-hours", title: "خارج از ساعت اداری", desc: "گزارش ثبت‌های خارج از ساعات کاری", icon: Timer, tone: "text-outside bg-outside-soft" },
-    { key: "account", path: "/account", title: "حساب کاربری", desc: "ظاهر، نصب، پیش‌نویس‌ها و خروج", icon: Settings2, tone: "text-muted-foreground bg-muted" },
+  const ALL_ITEMS = [
+    { key: "users", path: "/users", title: "مدیریت کاربران", desc: "مدیران، همکاران و چیدمان تیم‌ها", icon: UsersRound, tone: "text-primary bg-accent", adminOnly: true },
+    { key: "calendar", path: "/calendar", title: "تقویم کاری", desc: "روزها و ساعات کاری سازمان", icon: CalendarClock, tone: "text-primary bg-accent", adminOnly: true },
+    { key: "holidays", path: "/holidays", title: "تعطیلات رسمی", desc: "ورود تعطیلات سالانه", icon: CalendarDays, tone: "text-danger bg-danger-soft", adminOnly: true },
+    { key: "outside", path: "/outside-hours", title: "خارج از ساعت اداری", desc: "گزارش ثبت‌های خارج از ساعات کاری", icon: Timer, tone: "text-outside bg-outside-soft", adminOnly: false },
+    { key: "account", path: "/account", title: "حساب کاربری", desc: "ظاهر، نصب، پیش‌نویس‌ها و خروج", icon: Settings2, tone: "text-muted-foreground bg-muted", adminOnly: false },
   ];
+  const ITEMS = ALL_ITEMS.filter((i) => !i.adminOnly || !isManager);
 
   return (
     <div>
-      <PageHeader title="بیشتر" subtitle="ابزارهای مدیریتی" />
+      <PageHeader title="بیشتر" subtitle={isManager ? "ابزارهای تیم شما" : "ابزارهای مدیریتی"} />
       <div className="space-y-2.5 pb-6">
         {ITEMS.map((item) => (
           <button

@@ -1,19 +1,21 @@
 /**
  * POST /api/admin/logs/[id]/decision — approve | adjust | reject (spec §19).
- * Only pending logs are decidable; every decision stamps the admin.
+ * ONLY the collaborator's own team manager (role=manager) may decide.
+ * The supreme admin (role=admin) is a viewer and can never decide.
+ * Only pending logs are decidable; every decision stamps the manager.
  */
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { handle, readJson, ServerError } from "@/lib/server/api-helpers";
-import { requireAdmin } from "@/lib/server/auth";
+import { requireManager } from "@/lib/server/auth";
 import { serializeLog } from "@/lib/server/data";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
   return handle(async () => {
-    const admin = await requireAdmin();
+    const manager = await requireManager();
     const { id } = await ctx.params;
     const body = await readJson<{
       action?: "approve" | "adjust" | "reject";
@@ -24,14 +26,21 @@ export async function POST(req: Request, ctx: Ctx) {
 
     const log = await db.timeLog.findUnique({ where: { id } });
     if (!log) throw new ServerError("گزارش پیدا نشد.", "not_found");
+
+    // Hierarchy guard: the log owner must be one of this manager's collaborators
+    const owner = await db.user.findUnique({ where: { id: log.userId }, select: { managerId: true } });
+    if (!owner || owner.managerId !== manager.id) {
+      throw new ServerError("این گزارش تحت مدیریت شما نیست.", "forbidden");
+    }
+
     if (log.status !== "pending") {
       throw new ServerError("این گزارش قبلاً تصمیم‌گیری شده است.", "forbidden");
     }
 
     const now = new Date();
     const stamp = {
-      approvedBy: admin.id,
-      approvedByName: admin.name,
+      approvedBy: manager.id,
+      approvedByName: manager.name,
       approvedAt: now,
       updatedAt: now,
     };

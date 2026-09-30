@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const user = await db.user.findUnique({ where: { mobile: phone } });
+    const user = await db.user.findUnique({ where: { mobile: phone }, include: { manager: { select: { name: true } } } });
     if (!user) throw new ServerError("کاربر یافت نشد.", "not_found");
     if (!user.isActive) throw new ServerError("حساب شما غیرفعال شده است. با مدیر تماس بگیرید.", "forbidden");
 

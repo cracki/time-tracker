@@ -63,7 +63,9 @@ export function Splash() {
   );
 }
 
-const ADMIN_PATHS = new Set(["/people", "/users", "/reports", "/outside-hours", "/calendar", "/holidays", "/more"]);
+/** Role gating (hierarchy): admin = مدیر ارشد · manager = team lead · collaborator */
+const ADMIN_ONLY = new Set(["/users", "/calendar", "/holidays"]);
+const MGMT_PATHS = new Set(["/people", "/reports", "/outside-hours", "/more"]);
 const COLLAB_ONLY = new Set(["/stats"]);
 
 function AppGate() {
@@ -131,13 +133,18 @@ function AppGate() {
 
   // authed — role guard
   const isAdmin = user?.role === "admin";
-  const isAdminPath = ADMIN_PATHS.has(path) || path.startsWith("/people/");
+  const isManager = user?.role === "manager";
+  const isAdminOnlyPath = ADMIN_ONLY.has(path);
+  const isMgmtPath = MGMT_PATHS.has(path) || path.startsWith("/people/");
   const isCollabOnly = COLLAB_ONLY.has(path);
 
-  if (isAdmin && isCollabOnly) {
+  if (user && user.role !== "collaborator" && isCollabOnly) {
     return <WrongRole message="این صفحه برای همکاران است." />;
   }
-  if (!isAdmin && isAdminPath) {
+  if (isManager && isAdminOnlyPath) {
+    return <WrongRole message="این بخش فقط برای مدیر ارشد است." />;
+  }
+  if (!isAdmin && !isManager && (isAdminOnlyPath || isMgmtPath)) {
     return <WrongRole message="این صفحه نیاز به دسترسی مدیر دارد." />;
   }
 
@@ -147,6 +154,7 @@ function AppGate() {
       segments={route.segments}
       query={route.query}
       isAdmin={isAdmin}
+      isManager={isManager}
       otpReset={() => setOtpInfo(null)}
     />
   );
@@ -179,21 +187,24 @@ function ScreenSwitch({
   path,
   segments,
   isAdmin,
+  isManager,
 }: {
   path: string;
   segments: string[];
   query: Record<string, string>;
   isAdmin: boolean;
+  isManager: boolean;
   otpReset: () => void;
 }) {
   void isAdmin;
+  void isManager;
   const key = useMemo(() => segments.join("/"), [segments]);
 
   const screen = useMemo(() => {
     if (path === "/" || path === "/home") {
-      return isAdmin ? <AdminDashboardScreen /> : <CollabHomeScreen />;
+      return isAdmin || isManager ? <AdminDashboardScreen /> : <CollabHomeScreen />;
     }
-    if (path === "/logs") return isAdmin ? <AdminLogsScreen /> : <MyLogsScreen />;
+    if (path === "/logs") return isAdmin || isManager ? <AdminLogsScreen /> : <MyLogsScreen />;
     if (path === "/logs/new") return <LogFormScreen />;
     if (segments[0] === "logs" && segments[1] && segments[2] === "edit") {
       return <LogFormScreen editId={segments[1]} />;
@@ -211,7 +222,7 @@ function ScreenSwitch({
     if (path === "/more") return <MoreScreen />;
     if (path === "/about") return <AboutScreen />;
     return <NotFound />;
-  }, [path, segments, isAdmin]);
+  }, [path, segments, isAdmin, isManager]);
 
   return (
     <AppShell>

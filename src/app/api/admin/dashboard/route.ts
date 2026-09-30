@@ -1,22 +1,28 @@
-/** GET /api/admin/dashboard?from&to — admin overview aggregates (spec §22). */
+/**
+ * GET /api/admin/dashboard?from&to — overview aggregates (spec §22).
+ * admin (مدیر ارشد): whole organization. manager: only their team.
+ */
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { handle } from "@/lib/server/api-helpers";
-import { requireAdmin } from "@/lib/server/auth";
+import { requireManagerOrAdmin } from "@/lib/server/auth";
+import { teamUserIds, serializeLog, serializeUser } from "@/lib/server/data";
 import { tehranDaysAgoIso, tehranTodayIso } from "@/lib/server/rules";
-import { serializeLog, serializeUser } from "@/lib/server/data";
 import { addDays, isoDate, parseIso } from "@/lib/jalali";
 
 export async function GET(req: Request) {
   return handle(async () => {
-    await requireAdmin();
+    const actor = await requireManagerOrAdmin();
     const url = new URL(req.url);
     const from = url.searchParams.get("from") ?? tehranDaysAgoIso(29);
     const to = url.searchParams.get("to") ?? tehranTodayIso();
 
+    const teamIds = await teamUserIds(actor);
+    const teamWhere = teamIds === null ? {} : { userId: { in: teamIds } };
+
     const logs = await db.timeLog.findMany({
-      where: { workDate: { gte: from, lte: to } },
+      where: { workDate: { gte: from, lte: to }, ...teamWhere },
     });
     const logged = (arr: typeof logs) => arr.reduce((s, l) => s + l.originalDurationMinutes, 0);
 
@@ -32,17 +38,26 @@ export async function GET(req: Request) {
       });
     }
 
-    const collaborators = await db.user.findMany({ where: { role: "collaborator" } });
+    // Collaborators in scope: manager → own team, admin → everyone
+    const collaborators = await db.user.findMany({
+      where: { role: "collaborator", ...(teamIds === null ? {} : { managerId: actor.id }) },
+      include: { manager: { select: { name: true } } },
+    });
     const perUser = collaborators
       .map((u) => ({ user: serializeUser(u), minutes: logged(logs.filter((l) => l.userId === u.id)) }))
       .sort((a, b) => b.minutes - a.minutes);
 
     const activeTodaySet = new Set(
-      (await db.timeLog.findMany({ where: { workDate: tehranTodayIso() }, select: { userId: true } })).map((r) => r.userId),
+      (
+        await db.timeLog.findMany({
+          where: { workDate: tehranTodayIso(), ...teamWhere },
+          select: { userId: true },
+        })
+      ).map((r) => r.userId),
     );
 
     const recentPending = await db.timeLog.findMany({
-      where: { status: "pending" },
+      where: { status: "pending", ...teamWhere },
       orderBy: { createdAt: "desc" },
       take: 8,
     });
@@ -56,7 +71,7 @@ export async function GET(req: Request) {
       adjustedCount: logs.filter((l) => l.status === "adjusted").length,
       rejectedMinutes: logged(logs.filter((l) => l.status === "rejected")),
       outsideMinutes: logged(logs.filter((l) => l.outsideKind !== "normal")),
-      peopleCount: await db.user.count(),
+      peopleCount: collaborators.length,
       activeToday: activeTodaySet.size,
       trend,
       statusDist: (["approved", "adjusted", "pending", "rejected"] as const).map((s) => ({

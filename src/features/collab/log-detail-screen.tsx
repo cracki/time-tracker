@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, FileText, PenLine, ShieldAlert, X } from "lucide-react";
+import { Check, Eye, FileText, PenLine, ShieldAlert, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge, OutsideBadge } from "@/components/shared/status-badge";
 import { PageSpinner, ErrorState } from "@/components/shared/states";
@@ -45,12 +45,14 @@ export function LogDetailScreen({ logId }: { logId: string }) {
     // ["log", id]; this screen caches the {log, user} envelope. Sharing a key
     // would feed the envelope into the edit form and crash it.
     queryKey: ["log-envelope", logId],
-    queryFn: () => collabApi.getLog(logId), // owner-or-admin enforced server-side
+    queryFn: () => collabApi.getLog(logId), // owner/admin/team-manager enforced server-side
     enabled: !!user,
   });
 
   const log = res?.log ?? null;
   const logUser = res?.user ?? null;
+  // Decisions belong to the log owner's team manager only
+  const canDecide = user?.role === "manager" && logUser?.managerId === user?.id;
 
   if (isLoading) return <PageSpinner />;
   if (isError || !log) return <ErrorState onRetry={() => navigate("/logs")} title="این گزارش پیدا نشد." description="ممکن است حذف شده باشد یا دسترسی نداشته باشید." />;
@@ -153,7 +155,7 @@ export function LogDetailScreen({ logId }: { logId: string }) {
               </Button>
             </>
           ) : null}
-          {isAdmin && log.status === "pending" ? (
+          {canDecide && log.status === "pending" ? (
             <>
               <Button onClick={() => setAction("approve")} disabled={busy} className="h-12 flex-1 rounded-xl bg-success font-bold text-white hover:bg-success/90">
                 <Check className="size-4.5" aria-hidden />
@@ -169,7 +171,13 @@ export function LogDetailScreen({ logId }: { logId: string }) {
               </Button>
             </>
           ) : null}
-          {!canEdit && !(isAdmin && log.status === "pending") ? (
+          {isAdmin && log.status === "pending" ? (
+            <div className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent/60 py-3.5 text-xs font-semibold text-accent-foreground">
+              <Eye className="size-4" aria-hidden />
+              مدیر ارشد فقط مشاهده‌گر است — تصمیم‌گیری با مدیر تیم است.
+            </div>
+          ) : null}
+          {!canEdit && !(canDecide && log.status === "pending") && !isAdmin ? (
             <div className="flex w-full items-center justify-center gap-2 rounded-2xl bg-muted/60 py-3.5 text-xs text-muted-foreground">
               <FileText className="size-4" aria-hidden />
               این گزارش قفل شده — پس از تصمیم مدیر قابل تغییر نیست.
@@ -178,7 +186,7 @@ export function LogDetailScreen({ logId }: { logId: string }) {
         </div>
       </div>
 
-      {isAdmin ? (
+      {canDecide ? (
         <LogActions log={log} open={action} onOpenChange={setAction} busyId={busy ? log.id : null} setBusyId={(id) => setBusy(!!id)} />
       ) : null}
     </div>

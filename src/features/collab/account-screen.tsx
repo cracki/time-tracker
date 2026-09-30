@@ -157,6 +157,17 @@ export function AccountScreen() {
                     {toPersianDigits(user.mobile)}
                   </p>
                 ) : null}
+                {user?.role === "collaborator" ? (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {user.managerName ? (
+                      <>مدیر: <b className="font-bold text-foreground">{user.managerName}</b></>
+                    ) : (
+                      "بدون مدیر"
+                    )}
+                  </p>
+                ) : (
+                  user ? <p className="mt-0.5 text-[11px] font-semibold text-primary">{user.role === "admin" ? "مدیر ارشد" : "مدیر تیم"}</p> : null
+                )}
                 {user?.avatarUrl ? (
                   <button
                     type="button"

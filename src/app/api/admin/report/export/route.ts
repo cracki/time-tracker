@@ -12,8 +12,8 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { handle, ServerError } from "@/lib/server/api-helpers";
-import { requireAdmin } from "@/lib/server/auth";
-import { serializeLog } from "@/lib/server/data";
+import { requireManagerOrAdmin } from "@/lib/server/auth";
+import { teamUserIds, serializeLog } from "@/lib/server/data";
 import { formatJalali } from "@/lib/jalali";
 import { minutesToHHMM } from "@/lib/duration";
 import { toPersianDigits } from "@/lib/format";
@@ -120,7 +120,7 @@ h2.section { font-size: 13.5px; font-weight: 700; color: #0f172a; margin: 18px 0
 
 export async function GET(req: Request) {
   return handle(async () => {
-    await requireAdmin();
+    const actor = await requireManagerOrAdmin();
 
     const url = new URL(req.url);
     const from = url.searchParams.get("from") ?? "";
@@ -133,8 +133,13 @@ export async function GET(req: Request) {
     const dateWhere = { workDate: { gte: from, lte: to } };
     const rangeText = `از ${formatJalali(from, "long")} تا ${formatJalali(to, "long")}`;
 
-    const users = await db.user.findMany({ where: { role: "collaborator" } });
-    const logs = await db.timeLog.findMany({ where: dateWhere, orderBy: [{ workDate: "asc" }, { createdAt: "asc" }] });
+    const teamIds = await teamUserIds(actor);
+    const teamUserWhere = teamIds === null ? {} : { managerId: actor.id };
+    const users = await db.user.findMany({ where: { role: "collaborator", ...teamUserWhere } });
+    const logs = await db.timeLog.findMany({
+      where: { ...dateWhere, ...(teamIds === null ? {} : { userId: { in: teamIds } }) },
+      orderBy: [{ workDate: "asc" }, { createdAt: "asc" }],
+    });
 
     let title: string;
     let body: string;

@@ -3,17 +3,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { handle, ServerError } from "@/lib/server/api-helpers";
-import { requireAdmin } from "@/lib/server/auth";
-import { serializeLog, serializeUser } from "@/lib/server/data";
+import { requireManagerOrAdmin } from "@/lib/server/auth";
+import { assertTeamMember, serializeLog, serializeUser } from "@/lib/server/data";
 import { addDays, isoDate, parseIso } from "@/lib/jalali";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: Request, ctx: Ctx) {
   return handle(async () => {
-    await requireAdmin();
+    const actor = await requireManagerOrAdmin();
     const { id } = await ctx.params;
-    const user = await db.user.findUnique({ where: { id } });
+    await assertTeamMember(actor, id);
+    const user = await db.user.findUnique({ where: { id }, include: { manager: { select: { name: true } } } });
     if (!user) throw new ServerError("کاربر پیدا نشد.", "not_found");
 
     const url = new URL(req.url);

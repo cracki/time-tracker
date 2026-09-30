@@ -6,11 +6,13 @@ import db from "../helpers/db";
 import { TEST_USERS } from "../../scripts/seed-test";
 import { tehranTodayIso, tehranDaysAgoIso } from "../../src/lib/server/rules";
 
+let managerCookie = "";
 let adminCookie = "";
 let collabCookie = "";
 
 beforeAll(async () => {
-  [adminCookie, collabCookie] = await Promise.all([
+  [managerCookie, adminCookie, collabCookie] = await Promise.all([
+    login(TEST_USERS.manager.mobile),
     login(TEST_USERS.admin.mobile),
     login(TEST_USERS.collab.mobile),
   ]);
@@ -46,11 +48,11 @@ describe("POST /api/admin/logs/[id]/decision", () => {
     const res = await api<LogShape>(`/api/admin/logs/${id}/decision`, {
       method: "POST",
       body: json({ action: "approve" }),
-    }, adminCookie);
+    }, managerCookie);
     expect(res.status).toBe(200);
     expect(res.body.log?.status).toBe("approved");
     expect(res.body.log?.approvedDurationMinutes).toBe(60);
-    expect(res.body.log?.approvedByName).toContain("سعید");
+    expect(res.body.log?.approvedByName).toContain("نگار");
   });
 
   it("adjust: stores approvedDurationMinutes + adminNote", async () => {
@@ -58,7 +60,7 @@ describe("POST /api/admin/logs/[id]/decision", () => {
     const res = await api<LogShape>(`/api/admin/logs/${id}/decision`, {
       method: "POST",
       body: json({ action: "adjust", minutes: 120, note: "۳۰ دقیقه اضافه‌کاری" }),
-    }, adminCookie);
+    }, managerCookie);
     expect(res.status).toBe(200);
     expect(res.body.log?.status).toBe("adjusted");
     expect(res.body.log?.approvedDurationMinutes).toBe(120);
@@ -70,7 +72,7 @@ describe("POST /api/admin/logs/[id]/decision", () => {
     const res = await api(`/api/admin/logs/${id}/decision`, {
       method: "POST",
       body: json({ action: "adjust", minutes: 0 }),
-    }, adminCookie);
+    }, managerCookie);
     expect(res.status).toBe(400);
   });
 
@@ -79,7 +81,7 @@ describe("POST /api/admin/logs/[id]/decision", () => {
     const ok = await api<LogShape>(`/api/admin/logs/${id}/decision`, {
       method: "POST",
       body: json({ action: "reject", reason: "تکراری است" }),
-    }, adminCookie);
+    }, managerCookie);
     expect(ok.status).toBe(200);
     expect(ok.body.log?.status).toBe("rejected");
     expect(ok.body.log?.rejectionReason).toContain("تکراری");
@@ -89,7 +91,7 @@ describe("POST /api/admin/logs/[id]/decision", () => {
     const noReason = await api<LogShape>(`/api/admin/logs/${id2}/decision`, {
       method: "POST",
       body: json({ action: "reject" }),
-    }, adminCookie);
+    }, managerCookie);
     expect(noReason.status).toBe(200);
     expect(noReason.body.log?.status).toBe("rejected");
   });
@@ -99,14 +101,14 @@ describe("POST /api/admin/logs/[id]/decision", () => {
     const bad = await api(`/api/admin/logs/${id}/decision`, {
       method: "POST",
       body: json({ action: "delete" }),
-    }, adminCookie);
+    }, managerCookie);
     expect(bad.status).toBe(400);
 
-    await api(`/api/admin/logs/${id}/decision`, { method: "POST", body: json({ action: "approve" }) }, adminCookie);
+    await api(`/api/admin/logs/${id}/decision`, { method: "POST", body: json({ action: "approve" }) }, managerCookie);
     const again = await api(`/api/admin/logs/${id}/decision`, {
       method: "POST",
       body: json({ action: "approve" }),
-    }, adminCookie);
+    }, managerCookie);
     expect(again.status).toBe(403); // pending-only guard
   });
 });
@@ -138,7 +140,7 @@ describe("dashboards reflect decisions", () => {
   });
 
   it("admin logs list filters by status=pending", async () => {
-    const res = await api<{ items: { status: string }[]; total: number }>("/api/admin/logs?status=pending&pageSize=100", {}, adminCookie);
+    const res = await api<{ items: { status: string }[]; total: number }>("/api/admin/logs?status=pending&pageSize=100", {}, managerCookie);
     expect(res.status).toBe(200);
     expect(res.body.items.every((l) => l.status === "pending")).toBe(true);
   });

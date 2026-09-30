@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/** role: "admin" | "collaborator" */
+/** role: "admin" (مدیر ارشد, read-only) | "manager" (تأیید تیم خودش) | "collaborator" */
 model User {
   id          String    @id @default(cuid())
   name        String
@@ -16,14 +16,19 @@ model User {
   role        String    @default("collaborator")
   isActive    Boolean   @default(true)
   avatarColor String    @default("#0F766E")
-  /** Web path to the optimized avatar (public/uploads/avatars/…), null = initials avatar */
+  /** Web path to the optimized avatar (uploads/avatars/…), null = initials avatar */
   avatarUrl   String?
+  /** Only collaborators have a manager — the one who approves their logs */
+  managerId   String?
+  manager     User?     @relation("Team", fields: [managerId], references: [id], onDelete: SetNull)
+  teamMembers User[]    @relation("Team")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   logs        TimeLog[]
   sessions    Session[]
 
   @@index([role])
+  @@index([managerId])
 }
 
 /** status: pending|approved|adjusted|rejected — outsideKind: normal|outside|holiday|weekend */

@@ -24,7 +24,9 @@ export async function GET(_req: Request, ctx: Ctx) {
     const user = await requireUser();
     const { id } = await ctx.params;
     const log = await loadLog(id);
-    if (log.userId !== user.id && user.role !== "admin") {
+    // owner · supreme admin (view-only) · the owner's team manager
+    const isTeamManager = user.role === "manager" && log.user.managerId === user.id;
+    if (log.userId !== user.id && user.role !== "admin" && !isTeamManager) {
       throw new ServerError("دسترسی غیرمجاز.", "forbidden");
     }
     return NextResponse.json({

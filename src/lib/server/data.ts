@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { CalendarSettings, TimeLog, User } from "@/lib/types";
 import { DEFAULT_CALENDAR } from "@/lib/default-calendar";
+import { ServerError } from "./api-helpers";
 
 /* ── Tiny TTL cache for read-heavy, rarely-changed data (calendar/holidays).
    Saves two DB round-trips on every log list/create/stat request. Invalidated
@@ -99,6 +100,8 @@ export function serializeUser(u: {
   isActive: boolean;
   avatarColor: string;
   avatarUrl?: string | null;
+  managerId?: string | null;
+  manager?: { name: string } | null;
 }): User {
   return {
     id: u.id,
@@ -108,6 +111,8 @@ export function serializeUser(u: {
     isActive: u.isActive,
     avatarColor: u.avatarColor,
     avatarUrl: u.avatarUrl ?? null,
+    managerId: u.managerId ?? null,
+    managerName: u.manager?.name ?? null,
   };
 }
 
@@ -115,4 +120,35 @@ export function logOrderBy(sortWorkDateDesc = true) {
   return sortWorkDateDesc
     ? [{ workDate: "desc" as const }, { createdAt: "desc" as const }]
     : [{ workDate: "asc" as const }, { createdAt: "asc" as const }];
+}
+
+/* ── Team scoping (hierarchy) ─────────────────────────────────
+   admin (مدیر ارشد) sees everything; a manager only their own
+   collaborators. Returns null = unrestricted, or the visible
+   collaborator ids to build `userId: { in: ids }` filters. */
+
+export function teamUserIdsCacheKey(user: User): string {
+  return user.role === "admin" ? "all" : `mgr:${user.id}`;
+}
+
+/** Visible collaborator ids for the actor — null means unrestricted (admin). */
+export async function teamUserIds(user: User): Promise<string[] | null> {
+  if (user.role === "admin") return null;
+  const members = await db.user.findMany({ where: { managerId: user.id }, select: { id: true } });
+  return members.map((m) => m.id);
+}
+
+/** Log-level visibility filter for the actor. */
+export async function logScope(user: User): Promise<{ userId?: { in: string[] } }> {
+  const ids = await teamUserIds(user);
+  return ids === null ? {} : { userId: { in: ids } };
+}
+
+/** Throws when a manager tries to touch a collaborator outside their team. */
+export async function assertTeamMember(actor: User, collaboratorId: string): Promise<void> {
+  if (actor.role === "admin") return;
+  const target = await db.user.findUnique({ where: { id: collaboratorId }, select: { managerId: true } });
+  if (!target || target.managerId !== actor.id) {
+    throw new ServerError("این همکار تحت مدیریت شما نیست.", "forbidden");
+  }
 }

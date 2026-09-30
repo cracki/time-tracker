@@ -3,12 +3,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { handle } from "@/lib/server/api-helpers";
-import { requireAdmin } from "@/lib/server/auth";
-import { serializeLog, serializeUser } from "@/lib/server/data";
+import { requireManagerOrAdmin } from "@/lib/server/auth";
+import { teamUserIds, serializeLog, serializeUser } from "@/lib/server/data";
 
 export async function GET(req: Request) {
   return handle(async () => {
-    await requireAdmin();
+    const actor = await requireManagerOrAdmin();
     const url = new URL(req.url);
     const from = url.searchParams.get("from") ?? undefined;
     const to = url.searchParams.get("to") ?? undefined;
@@ -17,10 +17,14 @@ export async function GET(req: Request) {
       ? { workDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
       : {};
 
+    const teamIds = await teamUserIds(actor);
     const [users, logs] = await Promise.all([
-      db.user.findMany({ where: { role: "collaborator" } }),
+      db.user.findMany({
+        where: { role: "collaborator", ...(teamIds === null ? {} : { managerId: actor.id }) },
+        include: { manager: { select: { name: true } } },
+      }),
       db.timeLog.findMany({
-        where: dateWhere,
+        where: { ...dateWhere, ...(teamIds === null ? {} : { userId: { in: teamIds } }) },
         orderBy: [{ workDate: "desc" }, { createdAt: "desc" }],
       }),
     ]);

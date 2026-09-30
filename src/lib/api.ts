@@ -358,16 +358,19 @@ export interface ManagedUser extends User {
 export interface CreateUserInput {
   name: string;
   mobile: string;
-  role: "admin" | "collaborator";
+  role: "admin" | "manager" | "collaborator";
   avatarColor?: string;
+  /** Collaborators only — must point at an active manager */
+  managerId?: string | null;
 }
 
 export interface UpdateUserInput {
   name?: string;
   mobile?: string;
-  role?: "admin" | "collaborator";
+  role?: "admin" | "manager" | "collaborator";
   isActive?: boolean;
   avatarColor?: string;
+  managerId?: string | null;
 }
 
 export const usersApi = {

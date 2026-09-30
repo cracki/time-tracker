@@ -8,7 +8,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, ShieldCheck, UserPlus, UserRoundX, Trash2 } from "lucide-react";
+import { Search, ShieldCheck, UserPlus, UserRoundX, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { LogListSkeleton, EmptyState, ErrorState } from "@/components/shared/states";
@@ -16,6 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -35,9 +38,10 @@ const AVATAR_COLORS = [
 interface FormState {
   name: string;
   mobile: string;
-  role: "admin" | "collaborator";
+  role: "admin" | "manager" | "collaborator";
   avatarColor: string;
   isActive: boolean;
+  managerId: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -46,6 +50,7 @@ const EMPTY_FORM: FormState = {
   role: "collaborator",
   avatarColor: AVATAR_COLORS[0],
   isActive: true,
+  managerId: "none",
 };
 
 export function UsersScreen() {
@@ -79,7 +84,7 @@ export function UsersScreen() {
   };
 
   const openEdit = (u: ManagedUser) => {
-    setForm({ name: u.name, mobile: u.mobile, role: u.role, avatarColor: u.avatarColor, isActive: u.isActive });
+    setForm({ name: u.name, mobile: u.mobile, role: u.role, avatarColor: u.avatarColor, isActive: u.isActive, managerId: u.managerId ?? "none" });
     setFormError(null);
     setEditing(u);
   };
@@ -88,7 +93,7 @@ export function UsersScreen() {
     setSaving(true);
     setFormError(null);
     try {
-      await usersApi.create({ name: form.name, mobile: form.mobile, role: form.role, avatarColor: form.avatarColor });
+      await usersApi.create({ name: form.name, mobile: form.mobile, role: form.role, avatarColor: form.avatarColor, managerId: form.role === "collaborator" && form.managerId !== "none" ? form.managerId : null });
       toast.success("کاربر جدید ایجاد شد.");
       setCreateOpen(false);
       void qc.invalidateQueries({ queryKey: ["users-managed"] });
@@ -111,6 +116,7 @@ export function UsersScreen() {
         role: form.role,
         isActive: form.isActive,
         avatarColor: form.avatarColor,
+        managerId: form.role === "collaborator" && form.managerId !== "none" ? form.managerId : null,
       });
       toast.success("تغییرات ذخیره شد.");
       setEditing(null);
@@ -172,7 +178,7 @@ export function UsersScreen() {
       </div>
       <div>
         <Label className="mb-1.5 block text-sm font-semibold">نقش</Label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => setForm((f) => ({ ...f, role: "collaborator" }))}
@@ -185,6 +191,17 @@ export function UsersScreen() {
           </button>
           <button
             type="button"
+            onClick={() => setForm((f) => ({ ...f, role: "manager" }))}
+            className={cn(
+              "flex h-12 items-center justify-center gap-1.5 rounded-xl border text-sm font-bold transition-colors",
+              form.role === "manager" ? "border-primary bg-accent text-accent-foreground" : "bg-card text-muted-foreground",
+            )}
+          >
+            <Users className="size-4" aria-hidden />
+            مدیر
+          </button>
+          <button
+            type="button"
             onClick={() => setForm((f) => ({ ...f, role: "admin" }))}
             className={cn(
               "flex h-12 items-center justify-center gap-1.5 rounded-xl border text-sm font-bold transition-colors",
@@ -192,10 +209,35 @@ export function UsersScreen() {
             )}
           >
             <ShieldCheck className="size-4" aria-hidden />
-            مدیر
+            مدیر ارشد
           </button>
         </div>
+        <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
+          {form.role === "admin"
+            ? "مدیر ارشد همه‌ی گزارش‌ها را فقط ملاحظه می‌کند و چیدمان افراد را انجام می‌دهد."
+            : form.role === "manager"
+              ? "مدیر، گزارش‌های همکارانِ زیرمجموعه‌ی خودش را تأیید/رد/اصلاح می‌کند."
+              : "همکار زمان ثبت می‌کند و زیر نظر یکی از مدیران قرار می‌گیرد."}
+        </p>
       </div>
+
+      {form.role === "collaborator" ? (
+        <div>
+          <Label className="mb-1.5 block text-sm font-semibold">مدیر این همکار</Label>
+          <Select value={form.managerId} onValueChange={(v) => setForm((f) => ({ ...f, managerId: v }))}>
+            <SelectTrigger className="h-12 w-full rounded-xl bg-card">
+              <SelectValue placeholder="انتخاب کنید…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">بدون مدیر</SelectItem>
+              {(users ?? []).filter((m) => m.role === "manager" && m.isActive && m.id !== editing?.id).map((m) => (
+                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1 text-[11px] text-muted-foreground">گزارش‌های این همکار توسط مدیر انتخاب‌شده تأیید/رد می‌شود.</p>
+        </div>
+      ) : null}
       <div>
         <Label className="mb-1.5 block text-sm font-semibold">رنگ آواتار</Label>
         <div className="flex flex-wrap gap-2">
@@ -273,8 +315,14 @@ export function UsersScreen() {
                     {u.name}
                   </span>
                   {u.role === "admin" ? (
-                    <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">
+                    <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-bold text-danger">
                       <ShieldCheck className="size-3" aria-hidden />
+                      مدیر ارشد
+                    </span>
+                  ) : null}
+                  {u.role === "manager" ? (
+                    <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">
+                      <Users className="size-3" aria-hidden />
                       مدیر
                     </span>
                   ) : null}
@@ -282,10 +330,16 @@ export function UsersScreen() {
                     <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">شما</span>
                   ) : null}
                 </span>
-                <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="nums" dir="ltr">{toPersianDigits(u.mobile)}</span>
                   <span>•</span>
                   <span className="nums">{toPersianDigits(u.logCount)} گزارش</span>
+                  {u.role === "collaborator" && u.managerName ? (
+                    <>
+                      <span>•</span>
+                      <span>مدیر: <b className="font-bold text-foreground">{u.managerName}</b></span>
+                    </>
+                  ) : null}
                   {!u.isActive ? (
                     <>
                       <span>•</span>

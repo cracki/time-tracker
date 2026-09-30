@@ -1,10 +1,10 @@
 /**
- * Seed the SQLite database with the demo dataset (mirrors the prototype
- * mock-db seed, spec §77): 22 users (2 admins), ~50 days of logs,
- * official holidays (current + next Jalali year), default calendar.
+ * Seed the SQLite database with the hierarchical demo dataset:
+ *   1 مدیر ارشد (admin, view-only) → 3 مدیر (team managers) → 12 همکار
+ *   (~50 days of logs, official holidays current + next Jalali year,
+ *   default calendar). Idempotent: wipes and re-creates demo data.
  *
- * Run: bunx tsx scripts/seed.ts   (or: bun scripts/seed.ts)
- * Idempotent: wipes and re-creates demo data.
+ * Run: npx tsx scripts/seed.ts   (or: bun scripts/seed.ts)
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -18,7 +18,7 @@ function rng(seed: number) {
   return () => {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    t = (t + Math.imul(t ^ (t >>> 14), 1 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
@@ -26,14 +26,6 @@ function rng(seed: number) {
 const rand = rng(1405);
 const pick = <T,>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
 const between = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
-
-const NAME_POOL = [
-  "علی رضایی", "مریم احمدی", "رضا محمدی", "سارا کریمی", "حسین موسوی",
-  "نگار حسینی", "امیر تهرانی", "زهرا نوری", "محمد قاسمی", "فاطمه صادقی",
-  "پویا اکبری", "الهام رستمی", "سعید مرادی", "نازنین شریفی", "کامران فرهادی",
-  "شیرین عباسی", "بهرام کاظمی", "مینا یوسفی", "آرش سپهری", "لیلا جهانی",
-  "فرزاد امینی", "هانیه سلطانی",
-];
 
 const AVATAR_COLORS = [
   "#0F766E", "#B45309", "#7C3AED", "#BE185D", "#15803D",
@@ -50,6 +42,21 @@ const DESCRIPTIONS = [
   "تنظیم CI/CD", "بررسی امنیت API", "توسعه ماژول تقویم کاری", "اصلاح محاسبه ساعت‌های خارج از اداری",
   "پاسخ به تیکت‌های پشتیبانی", "طراحی UI موبایل", "پیاده‌سازی حالت آفلاین", "بررسی عملکرد داشبورد",
 ];
+
+/** Team structure: مدیر ارشد → 3 مدیر → 4 همکار each */
+const HIERARCHY = {
+  admin: { name: "علی رضایی", mobile: "09121000000" },
+  managers: [
+    { name: "مریم احمدی", mobile: "09122000001" },
+    { name: "رضا محمدی", mobile: "09122000002" },
+    { name: "سارا کریمی", mobile: "09122000003" },
+  ],
+  collaborators: [
+    "حسین موسوی", "نگار حسینی", "امیر تهرانی", "زهرا نوری",
+    "محمد قاسمی", "فاطمه صادقی", "پویا اکبری", "الهام رستمی",
+    "سعید مرادی", "نازنین شریفی", "کامران فرهادی", "شیرین عباسی",
+  ].map((name, i) => ({ name, mobile: `091230${String(1 + i).padStart(5, "0")}` })),
+};
 
 function statusForAge(daysAgo: number): string {
   const r = rand();
@@ -82,25 +89,42 @@ async function main() {
   await db.otpSession.deleteMany();
   await db.timeLog.deleteMany();
   await db.holiday.deleteMany();
+  // self-relation: clear children's managerId first
+  await db.user.updateMany({ data: { managerId: null } });
   await db.user.deleteMany();
   await db.calendarSettings.deleteMany();
 
-  console.log("── seeding: users (22, incl. 2 admins)");
-  const ADMIN_IDX = new Set([0, 21]);
-  const users = await Promise.all(
-    NAME_POOL.map((name, i) =>
-      db.user.create({
+  console.log("── seeding: hierarchy (1 admin · 3 managers · 12 collaborators)");
+  const admin = await db.user.create({
+    data: { ...HIERARCHY.admin, role: "admin", isActive: true, avatarColor: AVATAR_COLORS[0] },
+  });
+
+  const managers: { id: string; name: string }[] = [];
+  for (let i = 0; i < HIERARCHY.managers.length; i++) {
+    const m = HIERARCHY.managers[i];
+    managers.push(
+      await db.user.create({
+        data: { ...m, role: "manager", isActive: true, avatarColor: AVATAR_COLORS[(i + 1) % AVATAR_COLORS.length] },
+      }),
+    );
+  }
+
+  const collaborators: { id: string; managerId: string | null }[] = [];
+  for (let i = 0; i < HIERARCHY.collaborators.length; i++) {
+    const c = HIERARCHY.collaborators[i];
+    const manager = managers[i % managers.length];
+    collaborators.push(
+      await db.user.create({
         data: {
-          name,
-          mobile: `0912${String(1000000 + i * 111111).slice(0, 7)}`,
-          role: ADMIN_IDX.has(i) ? "admin" : "collaborator",
+          ...c,
+          role: "collaborator",
           isActive: true,
-          avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+          avatarColor: AVATAR_COLORS[(i + 4) % AVATAR_COLORS.length],
+          managerId: manager.id,
         },
       }),
-    ),
-  );
-  const admins = users.filter((u) => u.role === "admin");
+    );
+  }
 
   console.log("── seeding: holidays + calendar");
   const jy = dateToJalali(today()).jy;
@@ -110,7 +134,7 @@ async function main() {
     data: { id: "main", workingDaysJson: "[0,1,2,3]", workingStartTime: "08:00", workingEndTime: "17:00" },
   });
 
-  console.log("── seeding: logs (~50 days)");
+  console.log("── seeding: logs (~50 days, approved by team managers)");
   const holidaySet = new Set(holidayRows.map((h) => h.date));
   const t = today();
   const DAYS = 50;
@@ -131,7 +155,8 @@ async function main() {
     updatedAt: Date;
   }[] = [];
 
-  users.forEach((user, ui) => {
+  collaborators.forEach((user) => {
+    const reviewer = managers.find((m) => m.id === user.managerId) ?? managers[0];
     for (let d = DAYS; d >= 0; d--) {
       const date = addDays(t, -d);
       const iso = isoDate(date);
@@ -152,7 +177,6 @@ async function main() {
         createdAt.setHours(createdHour, between(0, 59), 0, 0);
         const needsReview = status === "approved" || status === "adjusted" || status === "rejected";
         const approvedAt = needsReview ? new Date(addDays(createdAt, between(0, 1))) : null;
-        const approver = admins.find((a) => a.id !== user.id) ?? admins[0];
         rows.push({
           userId: user.id,
           workDate: iso,
@@ -167,8 +191,8 @@ async function main() {
           rejectionReason: status === "rejected" && rand() < 0.6
             ? pick(["تکراری با گزارش قبلی بود.", "شواهد کافی برای این زمان وجود ندارد.", "توضیحات نامشخص است."])
             : null,
-          approvedBy: needsReview ? approver.id : null,
-          approvedByName: needsReview ? approver.name : null,
+          approvedBy: needsReview ? reviewer.id : null,
+          approvedByName: needsReview ? reviewer.name : null,
           approvedAt,
           createdAt,
           updatedAt: approvedAt ?? createdAt,
@@ -177,13 +201,14 @@ async function main() {
     }
   });
 
-  // guarantee fresh content for the primary demo collaborator (مریم احمدی)
-  const demo = users[1];
+  // guarantee fresh pending content for the primary demo collaborator (حسین موسوی —
+  // first collaborator of the first manager, مریم احمدی)
+  const demo = collaborators[0];
+  const demoManager = managers[0];
   const mk = (d: number, desc: string, min: number, status: string, kind = "normal") => {
     const date = addDays(t, -d);
     const createdAt = new Date(date);
     createdAt.setHours(between(9, 20), 30, 0, 0);
-    const approver = admins[1] ?? admins[0];
     const needsReview = status !== "pending";
     return {
       userId: demo.id,
@@ -195,8 +220,8 @@ async function main() {
       outsideKind: kind,
       adminNote: status === "adjusted" ? "۳۰ دقیقه اضافه‌کاری تأیید شد." : null,
       rejectionReason: status === "rejected" ? "این کار در گزارش روز قبل ثبت شده بود." : null,
-      approvedBy: needsReview ? approver.id : null,
-      approvedByName: needsReview ? approver.name : null,
+      approvedBy: needsReview ? demoManager.id : null,
+      approvedByName: needsReview ? demoManager.name : null,
       approvedAt: createdAt,
       createdAt,
       updatedAt: createdAt,
@@ -217,8 +242,10 @@ async function main() {
     logs: await db.timeLog.count(),
     holidays: await db.holiday.count(),
     pending: await db.timeLog.count({ where: { status: "pending" } }),
+    teams: await db.user.groupBy({ by: ["managerId"], where: { role: "collaborator" }, _count: true }),
   };
-  console.log("── seed complete:", counts);
+  console.log("── seed complete:", JSON.stringify(counts));
+  console.log(`   admin: ${HIERARCHY.admin.mobile} · managers: ${HIERARCHY.managers.map((m) => m.mobile).join(", ")} · collab: ${HIERARCHY.collaborators[0].mobile}`);
 }
 
 main()

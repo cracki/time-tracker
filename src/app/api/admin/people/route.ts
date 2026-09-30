@@ -3,13 +3,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { handle } from "@/lib/server/api-helpers";
-import { requireAdmin } from "@/lib/server/auth";
+import { requireManagerOrAdmin } from "@/lib/server/auth";
+import { teamUserIds } from "@/lib/server/data";
 import { serializeUser } from "@/lib/server/data";
 import { isoDate, presetRange } from "@/lib/jalali";
 
 export async function GET(req: Request) {
   return handle(async () => {
-    await requireAdmin();
+    const actor = await requireManagerOrAdmin();
     const url = new URL(req.url);
     const sort = url.searchParams.get("sort") ?? "most";
     const preset = url.searchParams.get("preset") ?? "";
@@ -24,7 +25,11 @@ export async function GET(req: Request) {
       }
     }
 
-    const users = await db.user.findMany({ where: { role: "collaborator" } });
+    const teamIds = await teamUserIds(actor);
+    const users = await db.user.findMany({
+      where: { role: "collaborator", ...(teamIds === null ? {} : { managerId: actor.id }) },
+      include: { manager: { select: { name: true } } },
+    });
     const logs = await db.timeLog.findMany({
       where: {
         ...(from || to ? { workDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),

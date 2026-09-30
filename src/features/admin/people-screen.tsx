@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { adminApi } from "@/lib/api";
+import { useAuth } from "@/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/navigation/router";
 import { isoDate, presetRange } from "@/lib/jalali";
@@ -33,6 +34,8 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 export function PeopleScreen() {
   const { navigate } = useRouter();
+  const { user } = useAuth();
+  const isManager = user?.role === "manager";
   const [range, setRange] = useState<RangeValue | null>(() => {
     const r = presetRange("thisWeek");
     return r ? { preset: "thisWeek", from: r.from, to: r.to } : null;
@@ -47,18 +50,20 @@ export function PeopleScreen() {
   return (
     <div>
       <PageHeader
-        title="افراد تیم"
+        title={isManager ? "افراد من" : "افراد تیم"}
         subtitle={data ? `${toPersianDigits(data.length)} همکار` : undefined}
         actions={
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="مدیریت کاربران"
-            onClick={() => navigate("/users")}
-            className="size-10 rounded-xl"
-          >
-            <UsersRound className="size-4.5" aria-hidden />
-          </Button>
+          !isManager ? (
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="مدیریت کاربران"
+              onClick={() => navigate("/users")}
+              className="size-10 rounded-xl"
+            >
+              <UsersRound className="size-4.5" aria-hidden />
+            </Button>
+          ) : undefined
         }
       />
 
@@ -97,6 +102,7 @@ export function PeopleScreen() {
               <div className="min-w-0 flex-1">
                 <UserChip user={s.user} size="md" />
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                  {s.user.managerName ? <span>مدیر: <b className="font-bold text-foreground">{s.user.managerName}</b></span> : null}
                   <span>ثبت‌شده: <b className="nums text-foreground">{minutesToHHMM(s.totalLoggedMinutes)}</b></span>
                   <span>تأییدشده: <b className="nums text-success">{minutesToHHMM(s.totalApprovedMinutes)}</b></span>
                   <span>در انتظار: <b className="nums text-warning">{minutesToHHMM(s.pendingMinutes)}</b></span>

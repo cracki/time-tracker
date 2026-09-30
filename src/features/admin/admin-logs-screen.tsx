@@ -50,6 +50,7 @@ const DAY_TYPES = [
 
 export function AdminLogsScreen() {
   const { user } = useAuth();
+  const isManager = user?.role === "manager";
   const { route, navigate } = useRouter();
 
   const initialStatus = (route.query.status as TimeLogStatus) || "all";
@@ -90,9 +91,15 @@ export function AdminLogsScreen() {
   });
 
   const { data: users } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => usersApi.getAll(),
-    enabled: !!user && user.role === "admin",
+    queryKey: ["filter-users", user?.role],
+    queryFn: async () => {
+      if (user?.role === "manager") {
+        const people = await adminApi.getPeople("");
+        return people.map((p) => p.user);
+      }
+      return usersApi.getAll();
+    },
+    enabled: !!user && (user.role === "admin" || user.role === "manager"),
   });
   const userById = useMemo(() => {
     const m = new Map((users ?? []).map((u) => [u.id, u]));
@@ -129,8 +136,8 @@ export function AdminLogsScreen() {
         showUser: true,
         user: userById(log.userId),
         onOpen: () => openLog(log.id),
-        onApprove: log.status === "pending" ? () => void approve(log.id) : undefined,
-        onReject: log.status === "pending" ? () => setTarget({ log, kind: "reject" }) : undefined,
+        onApprove: isManager && log.status === "pending" ? () => void approve(log.id) : undefined,
+        onReject: isManager && log.status === "pending" ? () => setTarget({ log, kind: "reject" }) : undefined,
         busy: busyId === log.id,
       })),
     [data, userById, openLog, approve, busyId],
@@ -141,7 +148,7 @@ export function AdminLogsScreen() {
   return (
     <div>
       <PageHeader
-        title="زمان‌های تیم"
+        title={isManager ? "زمان‌های تیم من" : "زمان‌های تیم"}
         subtitle={data ? `${toPersianDigits(data.total)} گزارش` : undefined}
         actions={
           <div className="flex items-center gap-2">
@@ -207,8 +214,8 @@ export function AdminLogsScreen() {
                     showUser
                     user={userById(log.userId)}
                     onOpen={() => navigate(`/logs/${log.id}`)}
-                    onApprove={log.status === "pending" ? () => void approve(log.id) : undefined}
-                    onReject={log.status === "pending" ? () => setTarget({ log, kind: "reject" }) : undefined}
+                    onApprove={isManager && log.status === "pending" ? () => void approve(log.id) : undefined}
+                    onReject={isManager && log.status === "pending" ? () => setTarget({ log, kind: "reject" }) : undefined}
                     busy={busyId === log.id}
                   />
                 ))}
@@ -244,7 +251,7 @@ export function AdminLogsScreen() {
                       <TableCell className="text-center"><StatusBadge status={log.status} size="xs" /></TableCell>
                       <TableCell className="text-center text-[11px]">{log.outsideKind !== "normal" ? toPersianDigits("✓") : "—"}</TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        {log.status === "pending" ? (
+                        {isManager && log.status === "pending" ? (
                           <div className="flex items-center justify-center gap-1">
                             <Button size="sm" onClick={() => void approve(log.id)} disabled={busyId === log.id} className="h-8 rounded-lg bg-success px-2.5 text-[11px] font-bold text-white hover:bg-success/90">
                               تأیید
@@ -257,7 +264,7 @@ export function AdminLogsScreen() {
                             </Button>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground">—</span>
+                          <span className="text-[11px] text-muted-foreground">{isManager ? "—" : "ملاحظه"}</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -341,8 +348,8 @@ export function AdminLogsScreen() {
         </DrawerContent>
       </Drawer>
 
-      {/* Pending action sheets */}
-      {target ? (
+      {/* Pending action sheets — decisions are managers-only */}
+      {target && isManager ? (
         <LogActions
           log={target.log}
           open={target.kind === "reject" ? "reject" : "adjust"}
