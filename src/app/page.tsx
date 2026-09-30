@@ -8,7 +8,11 @@ import { RouterProvider } from "@/navigation/router";
 function InlineSplash() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background" aria-label="در حال بارگذاری">
-      <img src="/logo.png" alt="" aria-hidden className="size-20 app-shadow" />
+      <span className="relative inline-grid place-items-center">
+        <span className="splash-ring" aria-hidden />
+        <span className="splash-ring" aria-hidden />
+        <img src="/logo.png" alt="" aria-hidden className="size-20 app-shadow" />
+      </span>
       <p className="mt-5 text-xl font-extrabold">زمان‌سنج</p>
       <p className="mt-1 text-xs text-muted-foreground">ثبت سریع زمان کاری</p>
     </div>

@@ -30,6 +30,7 @@ import { CalendarScreen } from "@/features/admin/calendar-screen";
 import { HolidaysScreen } from "@/features/admin/holidays-screen";
 import { MoreScreen } from "@/features/admin/more-screen";
 import { AboutScreen } from "@/features/shared/about-screen";
+import { OrbitLogo } from "@/components/shared/orbit-logo";
 
 /** Splash / launch experience (spec §36) */
 export function Splash() {
@@ -40,7 +41,7 @@ export function Splash() {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
-        <img src="/logo.png" alt="" aria-hidden className="size-20 app-shadow" />
+        <OrbitLogo size={96} />
       </motion.div>
       <motion.p
         initial={{ opacity: 0, y: 6 }}

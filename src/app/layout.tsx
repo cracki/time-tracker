@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "vazirmatn/Vazirmatn-font-face.css";
 import { AppProviders } from "@/providers/app-providers";
+import { AmbientBackground } from "@/components/shared/ambient-background";
 
 export const metadata: Metadata = {
   title: "زمان‌سنج — ثبت سریع زمان کاری",
@@ -45,6 +46,7 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground">
+        <AmbientBackground />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

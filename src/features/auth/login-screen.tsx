@@ -14,6 +14,7 @@ import { toLatinDigits, toPersianDigits } from "@/lib/format";
 import { DEMO_MODE } from "@/lib/demo-mode";
 import { useRouter } from "@/navigation/router";
 import { ThemeToggle } from "@/components/shared/app-shell";
+import { OrbitLogo } from "@/components/shared/orbit-logo";
 
 export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => void }) {
   const { navigate } = useRouter();
@@ -50,97 +51,112 @@ export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => voi
       </div>
       <div className="flex flex-1 flex-col justify-center px-6 pb-10 pt-16">
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
+          variants={STAGGER}
+          initial="hidden"
+          animate="show"
           className="mx-auto w-full max-w-sm"
         >
           {/* Brand */}
-          <div className="mb-10 text-center">
-            <img
-              src="/logo.png"
-              alt="لوگوی زمان‌سنج"
-              className="mx-auto mb-4 size-24 app-shadow"
-              aria-hidden
-            />
+          <motion.div variants={RISE} className="mb-8 text-center">
+            <OrbitLogo size={104} className="mx-auto mb-4" />
             <h1 className="text-2xl font-extrabold">زمان‌سنج</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
               ثبت سریع زمان کاری، بدون معطلی
             </p>
-          </div>
+          </motion.div>
 
-          <label htmlFor="phone" className="mb-2 block text-sm font-semibold">
-            شماره موبایل
-          </label>
-          <div className="relative">
-            <Input
-              id="phone"
-              inputMode="numeric"
-              autoComplete="tel"
-              autoFocus
-              dir="ltr"
-              placeholder="0912 345 6789"
-              className="h-14 rounded-2xl border-input bg-card text-center text-lg font-bold tracking-[0.2em] nums"
-              value={toPersianDigits(phone)}
-              onChange={(e) => {
-                const d = toLatinDigits(e.target.value).replace(/\D/g, "").slice(0, 11);
-                setPhone(d);
-                setError(null);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              aria-invalid={!!error}
-            />
-          </div>
-          {error ? (
-            <p className="mt-2 text-xs font-medium text-danger" role="alert">{error}</p>
-          ) : null}
-
-          <Button
-            onClick={submit}
-            disabled={loading}
-            className="mt-4 h-14 w-full rounded-2xl text-base font-bold shadow-lg shadow-primary/25 transition-transform active:scale-[0.98]"
-          >
-            {loading ? "در حال ارسال کد…" : "دریافت کد تأیید"}
-            {!loading ? <ArrowLeft className="size-4.5" aria-hidden /> : null}
-          </Button>
-
-          {/* Demo accounts — quick-fill chips (only when NEXT_PUBLIC_DEMO_MODE=1) */}
-          {demoMode ? (
-          <div className="mt-8 rounded-2xl border border-dashed border-border bg-muted/40 p-4">
-            <p className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-              <Info className="size-3.5" aria-hidden />
-              حساب‌های نمونه (نسخه نمایشی)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPhone(demoAdmin.mobile)}
-                className="min-h-11 rounded-xl border bg-card px-3 py-2 text-right transition-colors hover:border-primary/50"
-              >
-                <span className="block text-xs font-bold">مدیر</span>
-                <span className="block text-[11px] text-muted-foreground nums" dir="ltr">{toPersianDigits(demoAdmin.mobile)}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPhone(demoCollab.mobile)}
-                className="min-h-11 rounded-xl border bg-card px-3 py-2 text-right transition-colors hover:border-primary/50"
-              >
-                <span className="block text-xs font-bold">همکار</span>
-                <span className="block text-[11px] text-muted-foreground nums" dir="ltr">{toPersianDigits(demoCollab.mobile)}</span>
-              </button>
+          {/* Glass form panel */}
+          <motion.div variants={RISE} className="glass-panel p-5">
+            <label htmlFor="phone" className="mb-2 block text-sm font-semibold">
+              شماره موبایل
+            </label>
+            <div className="relative">
+              <Input
+                id="phone"
+                inputMode="numeric"
+                autoComplete="tel"
+                autoFocus
+                dir="ltr"
+                placeholder="0912 345 6789"
+                className="h-14 rounded-2xl border-input bg-card text-center text-lg font-bold tracking-[0.2em] nums"
+                value={toPersianDigits(phone)}
+                onChange={(e) => {
+                  const d = toLatinDigits(e.target.value).replace(/\D/g, "").slice(0, 11);
+                  setPhone(d);
+                  setError(null);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+                aria-invalid={!!error}
+              />
             </div>
-          </div>
-          ) : null}
+            {error ? (
+              <p className="mt-2 text-xs font-medium text-danger" role="alert">{error}</p>
+            ) : null}
+
+            <Button
+              onClick={submit}
+              disabled={loading}
+              className="mt-4 h-14 w-full rounded-2xl text-base font-bold shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30 active:scale-[0.98]"
+            >
+              {loading ? "در حال ارسال کد…" : "دریافت کد تأیید"}
+              {!loading ? <ArrowLeft className="size-4.5" aria-hidden /> : null}
+            </Button>
+
+            {/* Demo accounts — quick-fill chips (only when NEXT_PUBLIC_DEMO_MODE=1) */}
+            {demoMode ? (
+              <div className="mt-5 rounded-2xl border border-dashed border-border bg-muted/40 p-4">
+                <p className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                  <Info className="size-3.5" aria-hidden />
+                  حساب‌های نمونه (نسخه نمایشی)
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPhone(demoAdmin.mobile)}
+                    className="min-h-11 rounded-xl border bg-card px-3 py-2 text-right transition-colors hover:border-primary/50"
+                  >
+                    <span className="block text-xs font-bold">مدیر</span>
+                    <span className="block text-[11px] text-muted-foreground nums" dir="ltr">{toPersianDigits(demoAdmin.mobile)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhone(demoCollab.mobile)}
+                    className="min-h-11 rounded-xl border bg-card px-3 py-2 text-right transition-colors hover:border-primary/50"
+                  >
+                    <span className="block text-xs font-bold">همکار</span>
+                    <span className="block text-[11px] text-muted-foreground nums" dir="ltr">{toPersianDigits(demoCollab.mobile)}</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </motion.div>
         </motion.div>
       </div>
 
-      <button
+      <motion.button
+        variants={FADE}
+        initial="hidden"
+        animate="show"
         type="button"
         onClick={() => navigate("/about")}
         className="pb-6 text-center text-xs text-muted-foreground/70 hover:text-muted-foreground"
       >
         درباره زمان‌سنج
-      </button>
+      </motion.button>
     </div>
   );
 }
+
+/* Entrance choreography — staggered rise-and-fade */
+const STAGGER = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+};
+const RISE = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } },
+};
+const FADE = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.6 } },
+};

@@ -58,8 +58,10 @@
 :root {
   --radius: 1rem;
 
-  /* Base — light */
-  --background: oklch(0.977 0.004 160);
+  /* Base — light. --background is intentionally translucent so the aurora
+     and particles breathe through every screen (see body::before). */
+  --background: oklch(0.977 0.004 160 / 0.82);
+  --background-solid: oklch(0.977 0.004 160);
   --foreground: oklch(0.24 0.015 220);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.24 0.015 220);
@@ -109,7 +111,8 @@
 
 .dark {
   /* Base — dark */
-  --background: oklch(0.175 0.012 210);
+  --background: oklch(0.175 0.012 210 / 0.78);
+  --background-solid: oklch(0.175 0.012 210);
   --foreground: oklch(0.93 0.008 180);
   --card: oklch(0.216 0.014 210);
   --card-foreground: oklch(0.93 0.008 180);
@@ -239,4 +242,119 @@
 /* Sonner toast RTL-friendly positioning */
 [data-sonner-toaster] {
   font-family: "Vazirmatn", sans-serif;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   AURORA GLASS — ambient redesign layer (branch redesign/aurora-glass)
+   Aurora blobs live on body pseudo-elements (behind the translucent
+   --background); ParticleField (canvas) and grain render above them.
+   ════════════════════════════════════════════════════════════════ */
+
+html {
+  background: var(--background-solid);
+}
+
+/* Aurora — slow-breathing gradient field */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+}
+body::before {
+  background:
+    radial-gradient(42% 42% at 18% 22%, color-mix(in oklab, var(--primary) 26%, transparent), transparent 70%),
+    radial-gradient(38% 38% at 82% 14%, color-mix(in oklab, oklch(0.75 0.13 190) 24%, transparent), transparent 70%),
+    radial-gradient(46% 46% at 70% 85%, color-mix(in oklab, oklch(0.72 0.14 155) 20%, transparent), transparent 72%);
+  animation: aurora-a 38s ease-in-out infinite alternate;
+}
+body::after {
+  background:
+    radial-gradient(36% 36% at 85% 70%, color-mix(in oklab, oklch(0.8 0.12 80) 12%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 12% 78%, color-mix(in oklab, oklch(0.65 0.12 250) 14%, transparent), transparent 72%);
+  animation: aurora-b 52s ease-in-out infinite alternate;
+}
+.dark body::before {
+  background:
+    radial-gradient(42% 42% at 18% 22%, color-mix(in oklab, var(--primary) 30%, transparent), transparent 70%),
+    radial-gradient(38% 38% at 82% 14%, color-mix(in oklab, oklch(0.6 0.14 195) 22%, transparent), transparent 70%),
+    radial-gradient(46% 46% at 70% 85%, color-mix(in oklab, oklch(0.55 0.15 160) 20%, transparent), transparent 72%);
+}
+.dark body::after {
+  background:
+    radial-gradient(36% 36% at 85% 70%, color-mix(in oklab, oklch(0.7 0.12 80) 10%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 12% 78%, color-mix(in oklab, oklch(0.5 0.16 265) 18%, transparent), transparent 72%);
+}
+@keyframes aurora-a {
+  0%   { transform: translate3d(-4%, -3%, 0) scale(1) rotate(0deg); }
+  50%  { transform: translate3d(3%, 2%, 0) scale(1.12) rotate(6deg); }
+  100% { transform: translate3d(5%, -2%, 0) scale(1.04) rotate(-4deg); }
+}
+@keyframes aurora-b {
+  0%   { transform: translate3d(3%, 4%, 0) scale(1.1) rotate(2deg); }
+  50%  { transform: translate3d(-3%, -2%, 0) scale(0.96) rotate(-5deg); }
+  100% { transform: translate3d(-5%, 3%, 0) scale(1.08) rotate(3deg); }
+}
+
+/* Frosted glass — every card surface goes glassmorphic app-wide.
+   (Unlayered rule: intentionally overrides Tailwind's bg-card utility.) */
+.bg-card {
+  background-color: color-mix(in oklab, var(--card) 68%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+.bg-popover {
+  background-color: color-mix(in oklab, var(--popover) 86%, transparent);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+.bg-sidebar {
+  background-color: color-mix(in oklab, var(--sidebar) 62%, transparent);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+/* Hero glass panel (login / splash) */
+.glass-panel {
+  border-radius: 1.75rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+  background:
+    linear-gradient(155deg, color-mix(in oklab, var(--card) 55%, transparent), color-mix(in oklab, var(--card) 30%, transparent));
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--foreground) 10%, transparent),
+    0 24px 60px -28px color-mix(in oklab, var(--primary) 40%, transparent),
+    0 8px 30px -18px oklch(0 0 0 / 0.25);
+}
+.dark .glass-panel {
+  border-color: color-mix(in oklab, var(--foreground) 14%, transparent);
+  background:
+    linear-gradient(155deg, color-mix(in oklab, var(--card) 55%, transparent), color-mix(in oklab, var(--card) 25%, transparent));
+}
+
+/* Active nav item — soft glowing pill */
+aside button[aria-current="page"],
+nav[aria-label="ناوبری اصلی"] button[aria-current="page"] {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--primary) 22%, transparent),
+    0 10px 26px -14px color-mix(in oklab, var(--primary) 55%, transparent);
+}
+
+/* Pre-bundle splash ring (cheap pulse, no JS) */
+.splash-ring {
+  position: absolute;
+  inset: -14%;
+  border-radius: 9999px;
+  border: 1.5px solid color-mix(in oklab, var(--primary) 45%, transparent);
+  animation: splash-ring 2.6s ease-out infinite;
+}
+.splash-ring:nth-child(2) { animation-delay: 1.3s; }
+@keyframes splash-ring {
+  0%   { transform: scale(0.82); opacity: 0.9; }
+  70%  { transform: scale(1.25); opacity: 0; }
+  100% { transform: scale(1.25); opacity: 0; }
 }
