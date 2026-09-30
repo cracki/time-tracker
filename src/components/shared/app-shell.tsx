@@ -118,9 +118,7 @@ export function AppShell({
       {/* ── Desktop sidebar (lg+) ── */}
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-64 flex-col border-l bg-sidebar lg:flex">
         <div className="flex items-center gap-2.5 px-5 pb-4 pt-6">
-          <span className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <Timer className="size-5" aria-hidden />
-          </span>
+          <img src="/logo.png" alt="" aria-hidden className="size-10" />
           <div>
             <p className="text-base font-extrabold leading-6">زمان‌سنج</p>
             <p className="text-[11px] text-muted-foreground">ثبت و تأیید زمان تیم</p>
