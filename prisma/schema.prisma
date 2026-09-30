@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/** role: "admin" | "collaborator" */
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  /** 09xxxxxxxxx — unique */
+  mobile      String    @unique
+  role        String    @default("collaborator")
+  isActive    Boolean   @default(true)
+  avatarColor String    @default("#0F766E")
+  /** Web path to the optimized avatar (public/uploads/avatars/…), null = initials avatar */
+  avatarUrl   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  logs        TimeLog[]
+  sessions    Session[]
+
+  @@index([role])
+}
+
+/** status: pending|approved|adjusted|rejected — outsideKind: normal|outside|holiday|weekend */
+model TimeLog {
+  id                       String    @id @default(cuid())
+  userId                   String
+  user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /** ISO yyyy-mm-dd (Gregorian, local calendar date) — Jalali conversion in display layer */
+  workDate                 String
+  description              String
+  originalDurationMinutes  Int
+  approvedDurationMinutes  Int?
+  status                   String    @default("pending")
+  outsideKind              String    @default("normal")
+  adminNote                String?
+  rejectionReason          String?
+  approvedBy               String?
+  approvedByName           String?
+  approvedAt               DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([userId, workDate])
+  @@index([status])
+  @@index([workDate])
+}
+
+model Holiday {
+  id    String @id @default(cuid())
+  date  String @unique
+  title String
+}
+
+/** Singleton row (id = "main") */
+model CalendarSettings {
+  id                String @id @default("main")
+  /** JSON-encoded number[] — 0=شنبه … 6=جمعه (Prisma/SQLite has no int lists) */
+  workingDaysJson   String @default("[0,1,2,3,4]")
+  workingStartTime  String @default("08:00")
+  workingEndTime    String @default("17:00")
+}
+
+/** One per phone — server-side OTP with attempts/cooldown (spec §4) */
+model OtpSession {
+  id            String   @id @default(cuid())
+  phone         String   @unique
+  codeHash      String
+  expiresAt     DateTime
+  attempts      Int      @default(0)
+  cooldownUntil DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/** Cookie sessions — token stored directly (prototype; hash in production) */
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
