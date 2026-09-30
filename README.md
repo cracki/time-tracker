@@ -81,14 +81,22 @@ npm run test:e2e    # Playwright
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs nginx
-sudo npm i -g pm2
+sudo apt install -y nginx git libvips-tools   # libvips-tools: انکد آواتار روی CPUهای قدیمی
+```
 
-# فایروال
-sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
-sudo ufw enable
+**Node.js 22 ایزوله با nvm** — Next.js 16 به Node ≥ 20 نیاز دارد؛ اگر سرور Node قدیمی دارد (مثلاً 18 برای پروژه‌های دیگر)، با nvm نسخه‌ی 22 را بدون دست زدن به Node سیستم نصب کنید:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.nvm/nvm.sh
+nvm install 22 && nvm alias default 22
+npm i -g pm2
+```
+
+فایروال (اگر فعال است):
+
+```bash
+sudo ufw allow OpenSSH && sudo ufw allow 'Nginx Full' && sudo ufw enable
 ```
 
 ### ۲. دریافت کد و build
@@ -100,8 +108,17 @@ sudo chown -R $USER:$USER /var/www/time-tracker
 cd time-tracker
 
 cp .env.example .env
-nano .env   # DATABASE_URL، SMS_PROVIDER=kavenegar و کلیدها؛ NEXT_PUBLIC_DEMO_MODE را حتماً حذف کنید
+nano .env
+```
 
+نکات مهم `.env` در production:
+
+- `DATABASE_URL` باید **مسیر مطلق** باشد؛ چون سرور standalone مقدار را هنگام build درون باندل جای‌گذاری می‌کند:
+  `DATABASE_URL=file:/var/www/time-tracker/db/custom.db`
+- `NEXT_PUBLIC_DEMO_MODE` را حذف/خالی کنید و حتماً rebuild بگیرید.
+- `UPLOADS_ROOT=/var/www/time-tracker` — آواتارها بیرون از `.next` نوشته می‌شوند و nginx مستقیم سروشان می‌کند (پایدار بین دیپلوی‌ها؛ Next 16 فهرست `public/` را فقط هنگام استارت می‌خواند).
+
+```bash
 npm install
 npx prisma db push        # ایجاد/به‌روزرسانی دیتابیس
 npx prisma generate
@@ -111,18 +128,19 @@ npm run build             # خروجی standalone در .next/standalone
 ### ۳. همیشه روشن نگه‌داشتن بک‌اند (PM2)
 
 ```bash
-pm2 start npm --name time-tracker -- start     # همان NODE_ENV=production + server.js استاندالون
+cd /var/www/time-tracker
+DATABASE_URL="file:/var/www/time-tracker/db/custom.db" \
+UPLOADS_ROOT="/var/www/time-tracker" \
+PORT=3000 HOSTNAME=127.0.0.1 NODE_ENV=production \
+pm2 start .next/standalone/server.js --name time-tracker --cwd /var/www/time-tracker
 pm2 save
-pm2 startup systemd -u $USER --hp $HOME        # اجرای دستور چاپ‌شده را هم اجرا کنید
+pm2 startup systemd -u $USER --hp $HOME      # اجرای دستور چاپ‌شده را هم اجرا کنید
 ```
 
-با این کار اپ با ریبوت سرور دوباره بالا می‌آید و در صورت کرش، PM2 آن را restart می‌کند.
-بررسی: `pm2 status` / لاگ‌ها: `pm2 logs time-tracker`.
-
-> ⚠️ **پوشه‌ی آپلودها بین دیپلوی‌ها حفظ شود:** آواتارها در `.next/standalone/public/uploads/avatars` نوشته می‌شوند. قبل از `npm run build` بعدی، این پوشه را کپی/بازگردانی کنید، مثلاً:
-> ```bash
-> cp -r .next/standalone/public/uploads /tmp/tt-uploads && npm run build && cp -r /tmp/tt-uploads .next/standalone/public/
-> ```
+- اپ فقط روی `127.0.0.1:3000` گوش می‌دهد؛ دسترسی عمومی فقط از طریق nginx.
+- با ریبوت، PM2 خودش اپ را بالا می‌آورد و در صورت کرش restart می‌کند.
+- بررسی: `pm2 status` / لاگ‌ها: `pm2 logs time-tracker`.
+- داده‌ی نمونه (اختیاری): `DATABASE_URL=file:/var/www/time-tracker/db/custom.db npx tsx scripts/seed.ts`
 
 ### ۴. Nginx به‌عنوان وب‌سرور (دامنه + کش + پروکسی)
 
@@ -146,13 +164,19 @@ server {
     # ── کش: فایل‌های استاتیک Next.js (هش‌دار → کش دائمی) ──
     location /_next/static/ {
         proxy_pass http://127.0.0.1:3000;
-        proxy_cache_valid 200 365d;
         expires 365d;
         add_header Cache-Control "public, immutable";
     }
 
-    # ── کش: آیکون‌ها، لوگو و آواتارها ──
-    location ~* ^/(icons|uploads)/.*\.(png|jpg|jpeg|webp|svg|ico)$ {
+    # ── آواتارها: سرو مستقیم از دیسک (پایدار بین ری‌استارت و دیپلوی) ──
+    location ^~ /uploads/ {
+        alias /var/www/time-tracker/uploads/;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    # ── کش: آیکون‌ها و لوگو ──
+    location ~* ^/(icons)/.*\.(png|jpg|jpeg|webp|svg|ico)$ {
         proxy_pass http://127.0.0.1:3000;
         expires 30d;
         add_header Cache-Control "public";
@@ -168,7 +192,6 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
 
     # فشرده‌سازی (کاهش حجم پاسخ‌های JSON/HTML/SVG)
@@ -183,6 +206,8 @@ server {
         application/xml image/svg+xml;
 }
 ```
+
+> برای دسترسی با **IP و پورت** (قبل از آماده‌شدن دامنه): به‌جای `listen 80` بنویسید `listen 8080;` و `server_name _;` بگذارید — همان `http://SERVER_IP:8080` بالا می‌آید. دامنه که وصل شد فقط `server_name` را عوض کنید و certbot را اجرا کنید.
 
 فعال‌سازی:
 
@@ -208,14 +233,15 @@ sudo certbot renew --dry-run   # تست تمدید خودکار
 
 ```bash
 cd /var/www/time-tracker
+source ~/.nvm/nvm.sh
 git pull
 npm install
-cp -r .next/standalone/public/uploads /tmp/tt-uploads   # حفظ آواتارها
 npx prisma db push
 npm run build
-cp -r /tmp/tt-uploads .next/standalone/public/
-pm2 restart time-tracker
+pm2 restart time-tracker --update-env
 ```
+
+آواتارها در `/var/www/time-tracker/uploads/` هستند و با build دست نمی‌خورند.
 
 ### ۷. پشتیبان‌گیری دیتابیس (SQLite)
 
