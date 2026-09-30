@@ -60,3 +60,4 @@ server.log
 db/*.db
 db/*.db-journal
 /public/uploads
+*.zip
