@@ -9,10 +9,11 @@
  * upload always busts the browser cache.
  */
 
-import { mkdir, unlink, writeFile } from "fs/promises";
+import { execFile } from "child_process";
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import path from "path";
 import { NextResponse } from "next/server";
-import sharp from "sharp";
 import { db } from "@/lib/db";
 import { handle, ServerError } from "@/lib/server/api-helpers";
 import { requireUser, toPublicUser } from "@/lib/server/auth";
@@ -35,6 +36,47 @@ async function removeOldAvatarFile(avatarUrl: string | null): Promise<void> {
   await unlink(abs).catch(() => {});
 }
 
+/**
+ * Square-crop → 256×256 → WebP. Prefers sharp (local dev); if its native
+ * binary can't run (some VM CPUs lack the x86-64-v2 baseline the prebuilt
+ * libvips requires, e.g. the production host), falls back to the system
+ * `vips` CLI (libvips-tools) which auto-rotates by EXIF and crops with the
+ * same "attention" strategy.
+ */
+async function encodeAvatar(buffer: Buffer): Promise<Buffer> {
+  try {
+    const { default: sharp } = await import("sharp");
+    return await sharp(buffer)
+      .rotate()
+      .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "attention" })
+      .webp({ quality: 80 })
+      .toBuffer();
+  } catch (err) {
+    if (err instanceof ServerError) throw err;
+    return encodeWithVips(buffer);
+  }
+}
+
+async function encodeWithVips(buffer: Buffer): Promise<Buffer> {
+  const dir = await mkdtemp(path.join(tmpdir(), "avatar-"));
+  try {
+    const src = path.join(dir, "in");
+    const out = path.join(dir, "out.webp");
+    await writeFile(src, buffer);
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        "vips",
+        ["thumbnail", src, out, String(AVATAR_SIZE), "--crop", "attention"],
+        { timeout: 20_000 },
+        (err) => (err ? reject(err) : resolve()),
+      );
+    });
+    return await readFile(out);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 export async function POST(req: Request) {
   return handle(async () => {
     const user = await requireUser();
@@ -52,15 +94,9 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    // rotate() respects EXIF orientation; "cover" crops to a square — a
-    // non-square photo is center-cropped, so we never distort it.
     let webp: Buffer;
     try {
-      webp = await sharp(buffer)
-        .rotate()
-        .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: "cover", position: "attention" })
-        .webp({ quality: 80 })
-        .toBuffer();
+      webp = await encodeAvatar(buffer);
     } catch {
       throw new ServerError("تصویر قابل پردازش نیست — فایل دیگری انتخاب کنید.", "validation");
     }
