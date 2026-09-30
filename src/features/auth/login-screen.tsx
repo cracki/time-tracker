@@ -52,7 +52,6 @@ export function LoginScreen({ onSendCode }: { onSendCode: (phone: string) => voi
         >
           {/* Brand */}
           <div className="mb-10 text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png"
               alt="لوگوی زمان‌سنج"

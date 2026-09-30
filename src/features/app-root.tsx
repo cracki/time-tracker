@@ -39,7 +39,6 @@ export function Splash() {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="" aria-hidden className="size-20 app-shadow" />
       </motion.div>
       <motion.p
