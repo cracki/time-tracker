@@ -20,13 +20,22 @@ import { requireUser, toPublicUser } from "@/lib/server/auth";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // ۵ مگابایت
 const AVATAR_SIZE = 256; // displayed at ≤96px — 256 covers 2x+ retina
-const PUBLIC_DIR = path.join(process.cwd(), "public");
-const AVATARS_DIR = path.join(PUBLIC_DIR, "uploads", "avatars");
+/**
+ * Where the on-disk "uploads/" folder lives. In dev, Next serves
+ * <cwd>/public/uploads directly; in standalone production, Next 16 only
+ * reads the public/ index at boot, so uploads must live in a stable
+ * directory (UPLOADS_ROOT, e.g. the project root) that nginx serves as
+ * /uploads/ — which also keeps them alive across rebuilds.
+ */
+const UPLOADS_PARENT = process.env.UPLOADS_ROOT
+  ? path.resolve(process.env.UPLOADS_ROOT)
+  : path.join(process.cwd(), "public");
+const AVATARS_DIR = path.join(UPLOADS_PARENT, "uploads", "avatars");
 
 function absolutePath(avatarUrl: string): string | null {
   if (!avatarUrl.startsWith("/uploads/avatars/")) return null;
   // The value is server-generated (no user input) — still normalize defensively.
-  return path.join(PUBLIC_DIR, path.normalize(avatarUrl).replace(/^([/\\])+/, ""));
+  return path.join(UPLOADS_PARENT, path.normalize(avatarUrl).replace(/^([/\\])+/, ""));
 }
 
 async function removeOldAvatarFile(avatarUrl: string | null): Promise<void> {
